@@ -1,0 +1,21 @@
+backend 
+pip install -r requirements.txt
+uvicorn main:app --reload      
+
+Open in browser:
+
+http://127.0.0.1:8000
+
+Expected output:
+
+{"message":"Elderly Assistance Backend Running"}
+
+
+
+frontend
+node -v 
+npx create-expo-app@latest .   
+npx expo start --tunnel        
+
+install expo go app in pnone 
+scan the QR generated in the terminal
