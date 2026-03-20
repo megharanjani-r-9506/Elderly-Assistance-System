@@ -1,63 +1,97 @@
 import { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
+import { API } from '../services/api';
 
 export default function AddElderly() {
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
-  const [medical, setMedical] = useState('');
+  const [condition, setCondition] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleSave = () => {
-    alert('Elderly profile saved');
-    router.back();
+  const handleSave = async () => {
+    if (!name || !age || !condition || !email || !password) {
+      alert('Fill all fields');
+      return;
+    }
+
+    try {
+      await API.post('/elderly', {
+        name,
+        age: Number(age),
+        condition,
+        email,
+        password
+      });
+
+      alert('Elderly added successfully');
+
+      router.back();
+
+    } catch (err: any) {
+      console.log(err);
+      alert(err?.response?.data?.detail || 'Error saving');
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Add Elderly Profile</Text>
-
+      
       <TextInput
-        style={styles.input}
         placeholder="Name"
-        value={name}
+        style={styles.input}
         onChangeText={setName}
       />
 
       <TextInput
-        style={styles.input}
         placeholder="Age"
-        value={age}
+        style={styles.input}
         onChangeText={setAge}
         keyboardType="numeric"
       />
 
       <TextInput
+        placeholder="Condition"
         style={styles.input}
-        placeholder="Medical Notes"
-        value={medical}
-        onChangeText={setMedical}
+        onChangeText={setCondition}
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleSave}>
-        <Text style={styles.btnText}>Save</Text>
+      {/* 🔥 NEW FIELDS */}
+      <TextInput
+        placeholder="Elder Email"
+        style={styles.input}
+        onChangeText={setEmail}
+      />
+
+      <TextInput
+        placeholder="Password"
+        style={styles.input}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
+
+      <TouchableOpacity style={styles.btn} onPress={handleSave}>
+        <Text style={{ color: 'white', textAlign: 'center' }}>Save</Text>
       </TouchableOpacity>
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
-  title: { fontSize: 24, marginBottom: 20 },
+
   input: {
     backgroundColor: '#fff',
     padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
+    marginBottom: 10,
+    borderRadius: 6
   },
-  button: {
-    backgroundColor: '#2ecc71',
+
+  btn: {
+    backgroundColor: 'blue',
     padding: 15,
-    borderRadius: 8,
-  },
-  btnText: { color: '#fff', textAlign: 'center' },
+    borderRadius: 6
+  }
 });

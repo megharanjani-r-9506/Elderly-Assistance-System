@@ -1,100 +1,47 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
+import { API } from '../services/api';
 
 export default function Register() {
-  const [name, setName] = useState<string>('');
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [phone, setPhone] = useState<string>('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleRegister = () => {
-    // Temporary success flow
-    alert('Caregiver registered successfully');
-    router.replace('/login');
+  const handleRegister = async () => {
+    if (!email || !password) {
+      alert('Enter all fields');
+      return;
+    }
+
+    try {
+      const res = await API.post('/register', { email, password });
+
+      alert('Registered successfully');
+      router.replace('/login');
+
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Error');
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Caregiver Registration</Text>
+      <Text style={styles.title}>Register</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Full Name"
-        value={name}
-        onChangeText={setName}
-      />
+      <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} />
+      <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Phone Number"
-        value={phone}
-        onChangeText={setPhone}
-        keyboardType="phone-pad"
-      />
-
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-
-      <TouchableOpacity style={styles.registerBtn} onPress={handleRegister}>
-        <Text style={styles.btnText}>REGISTER</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => router.push('/login')}>
-        <Text style={styles.link}>Already have an account? Login</Text>
+      <TouchableOpacity style={styles.btn} onPress={handleRegister}>
+        <Text style={styles.text}>REGISTER</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#f4f4f4',
-  },
-  title: {
-    fontSize: 26,
-    textAlign: 'center',
-    marginBottom: 25,
-    fontWeight: 'bold',
-  },
-  input: {
-    backgroundColor: 'white',
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
-  },
-  registerBtn: {
-    backgroundColor: '#2ecc71',
-    padding: 15,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  btnText: {
-    textAlign: 'center',
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  link: {
-    textAlign: 'center',
-    marginTop: 15,
-    color: '#3498db',
-  },
+  container: { flex: 1, justifyContent: 'center', padding: 20 },
+  input: { backgroundColor: '#fff', padding: 15, marginBottom: 10 },
+  btn: { backgroundColor: 'green', padding: 15 },
+  text: { color: 'white', textAlign: 'center' },
+  title: { fontSize: 24, marginBottom: 20 },
 });

@@ -1,27 +1,51 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
+import { API } from '../services/api';
+import { setUser } from '../services/session';
 
 export default function Login() {
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    // Temporary navigation after login
-    router.replace('/(caregiver-tabs)');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      alert('Enter all fields');
+      return;
+    }
+
+    try {
+      const res = await API.post('/login', { email, password });
+
+      // ✅ Save logged-in user
+      setUser(res.data);
+
+      const role = res.data.role;
+
+      // ✅ Navigate based on role
+      if (role === 'caregiver') {
+        router.replace('/(caregiver-tabs)');
+      } else if (role === 'elderly') {
+        router.replace('/(elderly-tabs)');
+      } else {
+        alert('Unknown role');
+      }
+
+    } catch (err: any) {
+      console.log(err);
+      alert(err?.response?.data?.detail || 'Login failed');
+    }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Elderly Assistance</Text>
+      <Text style={styles.title}>Login</Text>
 
       <TextInput
         style={styles.input}
         placeholder="Email"
         value={email}
         onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
       />
 
       <TextInput
@@ -32,50 +56,23 @@ export default function Login() {
         secureTextEntry
       />
 
-      <TouchableOpacity style={styles.loginBtn} onPress={handleLogin}>
-        <Text style={styles.btnText}>LOGIN</Text>
+      <TouchableOpacity style={styles.btn} onPress={handleLogin}>
+        <Text style={styles.text}>LOGIN</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.push('/register')}>
-      <Text style={styles.link}>Register as Caregiver</Text>
+        <Text style={{ textAlign: 'center', marginTop: 15 }}>
+          Don't have an account? Register
+        </Text>
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#f4f4f4',
-  },
-  title: {
-    fontSize: 28,
-    textAlign: 'center',
-    marginBottom: 30,
-    fontWeight: 'bold',
-  },
-  input: {
-    backgroundColor: 'white',
-    padding: 15,
-    marginBottom: 15,
-    borderRadius: 8,
-  },
-  loginBtn: {
-    backgroundColor: '#3498db',
-    padding: 15,
-    borderRadius: 8,
-  },
-  btnText: {
-    textAlign: 'center',
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  link: {
-  textAlign: 'center',
-  marginTop: 15,
-  color: '#3498db',
-  },
+  container: { flex: 1, justifyContent: 'center', padding: 20 },
+  input: { backgroundColor: '#fff', padding: 15, marginBottom: 10 },
+  btn: { backgroundColor: '#3498db', padding: 15 },
+  text: { color: 'white', textAlign: 'center' },
+  title: { fontSize: 24, marginBottom: 20 },
 });
