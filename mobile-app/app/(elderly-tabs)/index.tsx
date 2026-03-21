@@ -15,114 +15,133 @@ export default function ElderDashboard() {
   const [tasks, setTasks] = useState<any[]>([]);
   const user = getUser();
 
+  // check if routine was created today
+  const isToday = (dateString: string) => {
+    const date = new Date(dateString);
+    const today = new Date();
+
+    return (
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
+    );
+  };
+
+  // 🔹 NEW: check if scheduled time has passed
+  const isTimeReached = (time: string) => {
+    if (!time) return false;
+
+    const parts = time.split(':');
+    const hour = parseInt(parts[0]);
+    const minute = parseInt(parts[1]);
+
+    const now = new Date();
+    const routineTime = new Date();
+    routineTime.setHours(hour, minute, 0, 0);
+
+    return now >= routineTime;
+  };
+
   const fetchTasks = async () => {
     try {
       const res = await API.get(`/routine/user/${user.email}`);
-      setTasks(res.data);
 
-      // Check delay for each task
-      res.data.forEach((task: any) => {
-        if (task.status === 'pending') {
-          checkDelay(task);
+      // 🔁 reset status daily
+      const updated = res.data.map((task: any) => {
+        if (!isToday(task.created_at)) {
+          task.status = 'pending';
         }
+        return task;
       });
 
+      setTasks(updated);
+
     } catch (err) {
-      console.log(err);
+      console.log('Routine fetch error:', err);
     }
   };
 
   useEffect(() => {
     fetchTasks();
 
-    // Auto refresh every 1 minute
+    // auto refresh every 60s
     const interval = setInterval(fetchTasks, 60000);
-
     return () => clearInterval(interval);
   }, []);
 
-  // Delay check logic (15 min rule)
-  const checkDelay = async (task: any) => {
-    try {
-      if (!task.created_at) return;
-
-      const created = new Date(task.created_at);
-      const now = new Date();
-
-      const diffMinutes =
-        (now.getTime() - created.getTime()) / 60000;
-
-      if (diffMinutes > 15 && task.status === 'pending') {
-        Alert.alert(
-          'Missed Task',
-          `${task.task} was not completed on time`
-        );
-
-        await API.post('/alert', {
-          elderly_id: task.elderly_id,
-          task: task.task
-        });
-      }
-
-    } catch (err) {
-      console.log('Delay check error', err);
+  // 🔹 MODIFIED: added time check and removed body from API call
+  const markDone = async (id: number, time: string) => {
+    if (!isTimeReached(time)) {
+      Alert.alert(
+        'Too Early',
+        'You can only mark this task as done after its scheduled time.'
+      );
+      return;
     }
-  };
 
-  const markDone = async (id: number) => {
     try {
-      await API.put(`/routine/${id}`);
+      console.log("Marking routine done:", id);
+
+      await API.put(`/routine/${id}`);  // matches your FastAPI route
       fetchTasks();
+
     } catch (err) {
-      console.log(err);
-      Alert.alert('Error', 'Could not update task');
+      console.log('Update error:', err);
+      Alert.alert('Error', 'Could not update routine');
     }
   };
 
-  const renderItem = ({ item }: any) => (
-    <View style={styles.card}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.task}>{item.task}</Text>
-        <Text style={styles.time}>{item.time}</Text>
-      </View>
+  const renderItem = ({ item }: any) => {
+    const canMark = item.status === 'pending' && isTimeReached(item.time);
 
-      {/* STATUS */}
-      <Text
-        style={[
-          styles.status,
-          item.status === 'done'
-            ? styles.done
-            : styles.pending
-        ]}
-      >
-        {item.status.toUpperCase()}
-      </Text>
+    return (
+      <View style={styles.card}>
+        <View style={styles.header}>
+          <Text style={styles.task}>{item.task}</Text>
+          <Text style={styles.time}>{item.time}</Text>
+        </View>
 
-      {/* ACTION */}
-      {item.status === 'pending' && (
-        <TouchableOpacity
-          style={styles.doneBtn}
-          onPress={() => markDone(item.id)}
+        <Text
+          style={[
+            styles.status,
+            item.status === 'done'
+              ? styles.done
+              : styles.pending
+          ]}
         >
-          <Text style={styles.doneText}>Mark as Done</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+          {item.status.toUpperCase()}
+        </Text>
+
+        {/* 🔹 MODIFIED: button only appears after scheduled time */}
+        {canMark && (
+          <TouchableOpacity
+            style={styles.doneBtn}
+            onPress={() => markDone(item.id, item.time)}
+          >
+            <Text style={styles.doneText}>Mark as Done</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* 🔹 NEW: show waiting message before time */}
+        {!canMark && item.status === 'pending' && (
+          <Text style={styles.waitText}>
+            Available after {item.time}
+          </Text>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>My Routine</Text>
+      <Text style={styles.title}>My Daily Routine</Text>
 
       <FlatList
         data={tasks}
         keyExtractor={(item: any) => item.id.toString()}
         renderItem={renderItem}
         ListEmptyComponent={
-          <Text style={styles.empty}>
-            No tasks assigned yet
-          </Text>
+          <Text style={styles.empty}>No routines assigned</Text>
         }
         contentContainerStyle={{ paddingBottom: 40 }}
       />
@@ -131,22 +150,23 @@ export default function ElderDashboard() {
 }
 
 const styles = StyleSheet.create({
+
   container: {
     flex: 1,
     backgroundColor: '#f4f6f8',
-    paddingHorizontal: 16,
+    paddingHorizontal: 16
   },
 
   title: {
     fontSize: 26,
     fontWeight: 'bold',
-    marginVertical: 10,
+    marginVertical: 10
   },
 
   empty: {
     textAlign: 'center',
     marginTop: 30,
-    color: 'gray',
+    color: 'gray'
   },
 
   card: {
@@ -154,47 +174,54 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 14,
     marginBottom: 14,
-    elevation: 2,
+    elevation: 2
   },
 
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
   },
 
   task: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: 'bold'
   },
 
   time: {
     color: 'gray',
-    fontSize: 14,
+    fontSize: 14
   },
 
   status: {
     marginTop: 6,
-    fontWeight: 'bold',
+    fontWeight: 'bold'
   },
 
   done: {
-    color: '#2ecc71',
+    color: '#2ecc71'
   },
 
   pending: {
-    color: '#e74c3c',
+    color: '#e74c3c'
   },
 
   doneBtn: {
     marginTop: 12,
     backgroundColor: '#2ecc71',
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 8
   },
 
   doneText: {
     color: 'white',
     textAlign: 'center',
-    fontWeight: '600',
+    fontWeight: '600'
   },
+
+  waitText: {
+    marginTop: 10,
+    color: 'gray',
+    fontStyle: 'italic'
+  }
+
 });

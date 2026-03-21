@@ -4,6 +4,15 @@ export default function ElderlyTabs() {
   return (
     <Tabs>
       <Tabs.Screen name="index" options={{ title: 'Home' }} />
+       <Tabs.Screen
+        name="emergency"
+        options={{
+          title: "SOS"
+        }}
+       />
     </Tabs>
+
+    
   );
+
 }

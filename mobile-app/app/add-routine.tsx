@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { API } from '../services/api';
-import * as Notifications from 'expo-notifications';
+// import * as Notifications from 'expo-notifications';
 
 export default function AddRoutine() {
   const { id } = useLocalSearchParams();
@@ -19,14 +19,14 @@ export default function AddRoutine() {
 
   const handleSave = async () => {
     if (!task || !time) {
-      Alert.alert('Error', 'Fill all fields');
+      Alert.alert('Error', 'Please fill all fields');
       return;
     }
 
-    // ✅ Validate time format HH:MM
-    const isValidTime = /^([01]\d|2[0-3]):([0-5]\d)$/.test(time);
-    if (!isValidTime) {
-      Alert.alert('Invalid Time', 'Use format HH:MM (e.g. 14:30)');
+    // HH:MM validation
+    const valid = /^([01]\d|2[0-3]):([0-5]\d)$/.test(time);
+    if (!valid) {
+      Alert.alert('Invalid Time', 'Use HH:MM format (e.g. 08:30)');
       return;
     }
 
@@ -37,83 +37,101 @@ export default function AddRoutine() {
         time
       });
 
-      // 🔔 Schedule notification
-      await scheduleNotification(task, time);
+      // await scheduleNotification(task, time);
 
-      Alert.alert('Success', 'Routine added');
+      Alert.alert('Success', 'Routine added successfully');
       router.back();
 
     } catch (err: any) {
       console.log(err);
-      Alert.alert('Error', err?.response?.data?.detail || 'Something went wrong');
+      Alert.alert(
+        'Error',
+        err?.response?.data?.detail || 'Could not add routine'
+      );
     }
   };
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Add Routine</Text>
+
       <TextInput
-        placeholder="Task (Medicine, Walk...)"
+        placeholder="Task (e.g. Take medicine)"
         style={styles.input}
+        value={task}
         onChangeText={setTask}
       />
 
       <TextInput
-        placeholder="Time (HH:MM e.g. 14:30)"
+        placeholder="Time (HH:MM e.g. 08:30)"
         style={styles.input}
+        value={time}
         onChangeText={setTime}
       />
 
       <TouchableOpacity style={styles.btn} onPress={handleSave}>
-        <Text style={styles.text}>Add Routine</Text>
+        <Text style={styles.btnText}>Save Routine</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-// 🔔 Notification Scheduler
+/* / 🔔 DAILY notification scheduler (fixed)
 const scheduleNotification = async (task: string, time: string) => {
   try {
     const [hour, minute] = time.split(':').map(Number);
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Reminder',
-        body: `Time for: ${task}`,
+        title: 'Routine Reminder',
+        body: `Time to: ${task}`,
       },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR, // ✅ FIX
-        hour,
-        minute,
-        repeats: false,
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+        hour: hour,
+        minute: minute,
+        repeats: true,
       },
-    });
+    }); 
 
   } catch (err) {
-    console.log('Notification error:', err);
-  }
-};
+    console.log('Notification scheduling error:', err);
+  } 
+}; */
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20
+    padding: 20,
+    backgroundColor: '#f4f6f8'
+  },
+
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20
   },
 
   input: {
-    backgroundColor: '#fff',
-    padding: 15,
-    marginBottom: 10,
-    borderRadius: 6
+    backgroundColor: 'white',
+    padding: 14,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ddd'
   },
 
   btn: {
-    backgroundColor: 'purple',
+    backgroundColor: '#6c5ce7',
     padding: 15,
-    borderRadius: 6
+    borderRadius: 10,
+    marginTop: 10
   },
 
-  text: {
+  btnText: {
     color: 'white',
-    textAlign: 'center'
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: 16
   }
 });

@@ -4,10 +4,15 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime
 
+
+
 app = FastAPI()
 
 # -------------------- DB --------------------
-engine = create_engine("sqlite:///./elderly.db", connect_args={"check_same_thread": False})
+engine = create_engine(
+    "sqlite:///./elderly.db",
+    connect_args={"check_same_thread": False}
+)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
@@ -38,9 +43,18 @@ class Routine(Base):
     id = Column(Integer, primary_key=True)
     elderly_id = Column(Integer)
     task = Column(String)
-    time = Column(String)  # HH:MM
+    time = Column(String)
     status = Column(String, default="pending")
-    created_at = Column(String, default=lambda: datetime.now().isoformat())  # 🔥 NEW
+    created_at = Column(String, default=lambda: datetime.now().isoformat())
+
+
+class Emergency(Base):
+    __tablename__ = "emergency"
+
+    id = Column(Integer, primary_key=True)
+    elderly_id = Column(Integer)
+    message = Column(String)
+    created_at = Column(String, default=lambda: datetime.now().isoformat())
 
 
 Base.metadata.create_all(bind=engine)
@@ -71,23 +85,26 @@ class RoutineSchema(BaseModel):
     time: str
 
 
+class RoutineUpdateSchema(BaseModel):
+    task: str
+    time: str
+
+
+class EmergencySchema(BaseModel):
+    email: str
+    message: str
+
+
 # -------------------- AUTH --------------------
 
 @app.post("/register")
 def register(user: RegisterSchema):
     db = SessionLocal()
 
-    existing = db.query(User).filter(User.email == user.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="User already exists")
+    if db.query(User).filter(User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="User exists")
 
-    new_user = User(
-        email=user.email,
-        password=user.password,
-        role="caregiver"
-    )
-
-    db.add(new_user)
+    db.add(User(email=user.email, password=user.password, role="caregiver"))
     db.commit()
 
     return {"message": "Caregiver registered"}
@@ -102,10 +119,7 @@ def login(user: LoginSchema):
     if not db_user or db_user.password != user.password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return {
-        "email": db_user.email,
-        "role": db_user.role
-    }
+    return {"email": db_user.email, "role": db_user.role}
 
 
 # -------------------- ELDERLY --------------------
@@ -114,30 +128,21 @@ def login(user: LoginSchema):
 def create_elderly(data: ElderlyCreateSchema):
     db = SessionLocal()
 
-    existing = db.query(User).filter(User.email == data.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="User already exists")
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=400, detail="User exists")
 
-    # create login
-    new_user = User(
-        email=data.email,
-        password=data.password,
-        role="elderly"
-    )
-    db.add(new_user)
+    db.add(User(email=data.email, password=data.password, role="elderly"))
     db.commit()
 
-    # create profile
-    new_elder = Elderly(
+    db.add(Elderly(
         name=data.name,
         age=data.age,
         condition=data.condition,
         user_email=data.email
-    )
-    db.add(new_elder)
+    ))
     db.commit()
 
-    return {"message": "Elderly + account created"}
+    return {"message": "Elderly created"}
 
 
 @app.get("/elderly")
@@ -146,59 +151,66 @@ def get_elderly():
     return db.query(Elderly).all()
 
 
+@app.delete("/elderly/{elder_id}")
+def delete_elderly(elder_id: int):
+    db = SessionLocal()
+
+    elder = db.query(Elderly).filter(Elderly.id == elder_id).first()
+    if not elder:
+        raise HTTPException(status_code=404, detail="Elder not found")
+
+    db.query(Routine).filter(Routine.elderly_id == elder_id).delete()
+    db.query(Emergency).filter(Emergency.elderly_id == elder_id).delete()
+    db.query(User).filter(User.email == elder.user_email).delete()
+
+    db.delete(elder)
+    db.commit()
+
+    return {"message": "Elder deleted"}
+
+
 # -------------------- ROUTINES --------------------
 
+# add routine
 @app.post("/routine")
 def add_routine(data: RoutineSchema):
     db = SessionLocal()
 
-    new_task = Routine(
+    db.add(Routine(
         elderly_id=data.elderly_id,
         task=data.task,
-        time=data.time,
-        status="pending",
-        created_at=datetime.now().isoformat()
-    )
-
-    db.add(new_task)
+        time=data.time
+    ))
     db.commit()
 
     return {"message": "Routine added"}
 
 
-# 🔵 Elder view (by email)
+# caregiver view routines (FIXES 405)
+@app.get("/routine/{elderly_id}")
+def get_routines_for_caregiver(elderly_id: int):
+    db = SessionLocal()
+    return db.query(Routine).filter(Routine.elderly_id == elderly_id).all()
+
+
+# elder view routines
 @app.get("/routine/user/{email}")
 def get_user_routines(email: str):
     db = SessionLocal()
 
     elder = db.query(Elderly).filter(Elderly.user_email == email).first()
-
     if not elder:
         raise HTTPException(status_code=404, detail="Elder not found")
 
-    tasks = db.query(Routine).filter(Routine.elderly_id == elder.id).all()
-
-    return tasks
+    return db.query(Routine).filter(Routine.elderly_id == elder.id).all()
 
 
-# 🔵 Caregiver view (by elderly id)
-@app.get("/routine/{elderly_id}")
-def get_routines_by_elderly(elderly_id: int):
-    db = SessionLocal()
-
-    tasks = db.query(Routine).filter(Routine.elderly_id == elderly_id).all()
-
-    return tasks
-
-
-# -------------------- MARK DONE --------------------
-
+# mark routine done
 @app.put("/routine/{id}")
 def mark_done(id: int):
     db = SessionLocal()
 
     task = db.query(Routine).filter(Routine.id == id).first()
-
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
@@ -208,13 +220,75 @@ def mark_done(id: int):
     return {"message": "Completed"}
 
 
-# -------------------- ALERT SYSTEM --------------------
+# edit routine
+@app.put("/routine/edit/{id}")
+def edit_routine(id: int, data: RoutineUpdateSchema):
+    db = SessionLocal()
 
-@app.post("/alert")
-def alert_caregiver(data: dict):
-    """
-    Called when elder misses task
-    """
-    print("🚨 ALERT: Elder missed task:", data)
+    task = db.query(Routine).filter(Routine.id == id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
 
-    return {"message": "Caregiver alerted"}
+    task.task = data.task
+    task.time = data.time
+    db.commit()
+
+    return {"message": "Routine updated"}
+
+
+# delete routine
+@app.delete("/routine/{id}")
+def delete_routine(id: int):
+    db = SessionLocal()
+
+    task = db.query(Routine).filter(Routine.id == id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    db.delete(task)
+    db.commit()
+
+    return {"message": "Routine deleted"}
+
+
+# -------------------- EMERGENCY --------------------
+
+@app.post("/emergency")
+def trigger_emergency(data: EmergencySchema):
+    db = SessionLocal()
+
+    elder = db.query(Elderly).filter(Elderly.user_email == data.email).first()
+    if not elder:
+        raise HTTPException(status_code=404, detail="Elder not found")
+
+    db.add(Emergency(
+        elderly_id=elder.id,
+        message=data.message
+    ))
+    db.commit()
+
+    print(f"🚨 EMERGENCY from {elder.name}")
+
+    return {"message": "Emergency stored"}
+
+
+@app.get("/emergency")
+def get_emergencies():
+    db = SessionLocal()
+
+    alerts = (
+        db.query(Emergency, Elderly.name)
+        .join(Elderly, Emergency.elderly_id == Elderly.id)
+        .order_by(Emergency.id.desc())
+        .all()
+    )
+
+    return [
+        {
+            "id": a.Emergency.id,
+            "name": a.name,
+            "message": a.Emergency.message,
+            "time": a.Emergency.created_at
+        }
+        for a in alerts
+    ]

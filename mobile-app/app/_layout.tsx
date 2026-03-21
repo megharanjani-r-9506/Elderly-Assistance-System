@@ -1,8 +1,8 @@
 import { Stack } from 'expo-router';
-import * as Notifications from 'expo-notifications';
+// import * as Notifications from 'expo-notifications';
 import { useEffect } from 'react';
 useEffect(() => {
-  Notifications.requestPermissionsAsync();
+  // Notifications.requestPermissionsAsync();
 }, []);
 export default function RootLayout() {
   return (

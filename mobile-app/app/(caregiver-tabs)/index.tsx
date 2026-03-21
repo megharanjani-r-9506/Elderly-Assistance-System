@@ -5,13 +5,13 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView
+  Alert
 } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { API } from '../../services/api';
 
 export default function Dashboard() {
-  const [elderly, setElderly] = useState<any[]>([]);
+  const [elderly, setElderly] = useState([]);
 
   const fetchElderly = async () => {
     try {
@@ -31,207 +31,138 @@ export default function Dashboard() {
   const handleDelete = async (id: number) => {
     try {
       await API.delete(`/elderly/${id}`);
+      Alert.alert("Deleted", "Elder removed successfully");
       fetchElderly();
-    } catch {
-      alert('Delete failed');
+    } catch (err: any) {
+      console.log("Delete error:", err?.response?.data || err);
+      Alert.alert("Error", "Could not delete elder");
     }
   };
 
-  const renderItem = ({ item }: any) => (
-    <View style={styles.card}>
-      {/* HEADER */}
-      <View style={styles.header}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.age}>{item.age} yrs</Text>
-      </View>
-
-      {/* DETAILS */}
-      <Text style={styles.label}>Condition</Text>
-      <Text style={styles.condition}>{item.condition}</Text>
-
-      {/* ACTION ROW 1 */}
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={[styles.btn, styles.editBtn]}
-          onPress={() =>
-            router.push({
-              pathname: '/edit-elderly',
-              params: {
-                id: item.id,
-                name: item.name,
-                age: item.age,
-                condition: item.condition,
-              },
-            })
-          }
-        >
-          <Text style={styles.btnText}>Edit</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.btn, styles.deleteBtn]}
-          onPress={() => handleDelete(item.id)}
-        >
-          <Text style={styles.btnText}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ACTION ROW 2 */}
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={[styles.btn, styles.routineBtn]}
-          onPress={() =>
-            router.push({
-              pathname: '/add-routine',
-              params: { id: item.id },
-            })
-          }
-        >
-          <Text style={styles.btnText}>Add Routine</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.btn, styles.viewBtn]}
-          onPress={() =>
-            router.push({
-              pathname: '/view-routine',
-              params: { id: item.id },
-            })
-          }
-        >
-          <Text style={styles.btnText}>View Routine</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const confirmDelete = (id: number) => {
+    Alert.alert(
+      "Delete Elder",
+      "This will remove the elder and all associated data.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => handleDelete(id)
+        }
+      ]
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* PAGE HEADER */}
+    <View style={styles.container}>
       <Text style={styles.title}>Caregiver Dashboard</Text>
 
-      {/* ADD ELDERLY BUTTON */}
       <TouchableOpacity
         style={styles.addBtn}
         onPress={() => router.push('/add-elderly')}
       >
-        <Text style={styles.addText}>＋ Add Elderly</Text>
+        <Text style={styles.text}>+ Add Elderly</Text>
       </TouchableOpacity>
 
-      {/* LIST */}
       <FlatList
         data={elderly}
         keyExtractor={(item: any) => item.id.toString()}
-        renderItem={renderItem}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No elderly added yet</Text>
-        }
-        contentContainerStyle={{ paddingBottom: 40 }}
+        ListEmptyComponent={<Text>No elderly added</Text>}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.name}>{item.name}</Text>
+            <Text>Age: {item.age}</Text>
+            <Text>Condition: {item.condition}</Text>
+
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => confirmDelete(item.id)}
+              >
+                <Text style={styles.btnText}>Delete</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() =>
+                  router.push({
+                    pathname: '/edit-elderly',
+                    params: {
+                      id: item.id,
+                      name: item.name,
+                      age: item.age,
+                      condition: item.condition,
+                    },
+                  })
+                }
+              >
+                <Text style={styles.btnText}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.row}>
+              <TouchableOpacity
+                style={styles.routineBtn}
+                onPress={() =>
+                  router.push({
+                    pathname: '/add-routine',
+                    params: { id: item.id }
+                  })
+                }
+              >
+                <Text style={styles.btnText}>Add Routine</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.viewBtn}
+                onPress={() =>
+                  router.push({
+                    pathname: '/view-routine',
+                    params: { id: item.id }
+                  })
+                }
+              >
+                <Text style={styles.btnText}>View Routine</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f4f6f8',
-    paddingHorizontal: 16,
-  },
-
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginVertical: 10,
-  },
-
-  addBtn: {
-    backgroundColor: '#2ecc71',
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-
-  addText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-
-  empty: {
-    textAlign: 'center',
-    marginTop: 30,
-    color: 'gray',
-  },
-
+  container: { flex: 1, padding: 20 },
+  title: { fontSize: 24, marginBottom: 10 },
+  addBtn: { backgroundColor: 'green', padding: 15, marginBottom: 10 },
+  text: { color: 'white', textAlign: 'center' },
   card: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 14,
-    marginBottom: 14,
-    elevation: 2,
-  },
-
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-
-  name: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-
-  age: {
-    color: 'gray',
-  },
-
-  label: {
-    fontSize: 12,
-    color: '#888',
-  },
-
-  condition: {
+    backgroundColor: '#eee',
+    padding: 15,
     marginBottom: 10,
-    fontSize: 15,
+    borderRadius: 8
   },
-
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-
-  btn: {
-    flex: 1,
-    padding: 10,
-    borderRadius: 8,
-    marginRight: 6,
-  },
-
-  btnText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-
-  editBtn: {
-    backgroundColor: '#f39c12',
-  },
-
+  name: { fontSize: 18, fontWeight: 'bold' },
+  row: { flexDirection: 'row', marginTop: 10 },
   deleteBtn: {
-    backgroundColor: '#e74c3c',
-    marginRight: 0,
+    backgroundColor: 'red',
+    padding: 10,
+    marginRight: 10
   },
-
+  editBtn: {
+    backgroundColor: 'orange',
+    padding: 10
+  },
   routineBtn: {
-    backgroundColor: '#8e44ad',
+    backgroundColor: 'purple',
+    padding: 10,
+    marginRight: 10
   },
-
   viewBtn: {
-    backgroundColor: '#2980b9',
-    marginRight: 0,
+    backgroundColor: 'blue',
+    padding: 10
   },
+  btnText: { color: 'white' }
 });
